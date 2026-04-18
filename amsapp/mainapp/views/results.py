@@ -276,76 +276,93 @@ def get_all_results_by_teacher(request, teacher_id):
         else:
             exams = Exam.objects.filter(id__in=exam_ids)
 
-        # Get all results data
+        from collections import defaultdict
+
+        exams_list = list(exams)
+        exam_ids_list = [e.id for e in exams_list]
+
+        assignments = list(StudentAssignTeacherExam.objects.filter(
+            teacher=teacher, exam_id__in=exam_ids_list
+        ))
+        
+        assigned_student_ids = list(set([a.student_id for a in assignments]))
+        students_dict = {s.id: s for s in Students.objects.filter(id__in=assigned_student_ids)}
+
+        exam_student_map = defaultdict(list)
+        for a in assignments:
+            exam_student_map[a.exam_id].append(a.student_id)
+
+        exam_subject_counts = defaultdict(lambda: defaultdict(int))
+        for eq in ExamQuestion.objects.filter(exam_id__in=exam_ids_list):
+            exam_subject_counts[eq.exam_id][eq.subject] += 1
+
+        submissions_list = list(Submission.objects.filter(
+            exam_id__in=exam_ids_list,
+            student_id__in=assigned_student_ids
+        ).select_related('question'))
+
+        submissions_dict = defaultdict(lambda: defaultdict(list))
+        for sub in submissions_list:
+            submissions_dict[sub.exam_id][sub.student_id].append(sub)
+
+        viva_marks_dict = {v.student_id: v for v in VivaMarks.objects.filter(student_id__in=assigned_student_ids)}
+
         results_data = []
 
-        for exam in exams:
-            # For each exam, find all students assigned by this teacher
-            student_ids = StudentAssignTeacherExam.objects.filter(
-                teacher=teacher, exam=exam
-            ).values_list('student_id', flat=True).distinct()
+        for exam in exams_list:
+            student_ids = exam_student_map.get(exam.id, [])
+            exam_subjects_dict = exam_subject_counts.get(exam.id, {})
 
-            for student in Students.objects.filter(id__in=student_ids):
-                # Teachers can see results regardless of publication status
-                # No publication check needed for teachers
+            for s_id in student_ids:
+                if s_id not in students_dict: continue
+                student = students_dict[s_id]
 
-                # Get student's submissions for this exam
-                submissions = Submission.objects.filter(
-                    student=student,
-                    exam=exam
-                ).select_related('question')
+                student_submissions = submissions_dict.get(exam.id, {}).get(s_id, [])
 
-                if submissions.exists():
-                    # Calculate overall results
-                    total_submissions = submissions.count()
-                    correct_submissions = submissions.filter(is_correct=True).count()
+                if student_submissions:
+                    total_submissions = len(student_submissions)
+                    correct_submissions = sum(1 for s in student_submissions if s.is_correct)
                     wrong_submissions = total_submissions - correct_submissions
                     score_percentage = (correct_submissions / total_submissions * 100) if total_submissions > 0 else 0
 
-                    # Get all subjects from this exam first
-                    exam_subjects = ExamQuestion.objects.filter(exam=exam).values_list('subject', flat=True).distinct()
-                    
-                    # Initialize subjects_data with all subjects from the exam
                     subjects_data = {}
-                    for subject_name in exam_subjects:
+                    for subject_name, total_q in exam_subjects_dict.items():
                         subjects_data[subject_name] = {
                             'subject_id': subject_name,
                             'subject_name': subject_name,
-                            'total_questions': 0,
+                            'total_questions': total_q,
                             'correct_answers': 0,
                             'wrong_answers': 0,
                         }
-                    
-                    # Count total questions per subject in the exam
-                    for subject_name in exam_subjects:
-                        total_questions_in_subject = ExamQuestion.objects.filter(exam=exam, subject=subject_name).count()
-                        subjects_data[subject_name]['total_questions'] = total_questions_in_subject
-                    
-                    # Calculate subject-wise results from submissions
-                    for submission in submissions:
-                        subject_name = submission.question.subject
-                        if submission.is_correct:
+
+                    for s in student_submissions:
+                        subject_name = s.question.subject
+                        if subject_name not in subjects_data:
+                            subjects_data[subject_name] = {
+                                'subject_id': subject_name,
+                                'subject_name': subject_name,
+                                'total_questions': 0,
+                                'correct_answers': 0,
+                                'wrong_answers': 0,
+                            }
+                        if s.is_correct:
                             subjects_data[subject_name]['correct_answers'] += 1
                         else:
                             subjects_data[subject_name]['wrong_answers'] += 1
 
-                    # Calculate percentage for each subject
-                    for subject_name in subjects_data:
-                        subject_data = subjects_data[subject_name]
-                        total = subject_data['total_questions']
-                        correct = subject_data['correct_answers']
-                        subject_data['score_percentage'] = (correct / total * 100) if total > 0 else 0
+                    for s_data in subjects_data.values():
+                        total = s_data['total_questions']
+                        correct = s_data['correct_answers']
+                        s_data['score_percentage'] = (correct / total * 100) if total > 0 else 0
 
-                    # Get viva marks for this student
-                    viva_marks_data = None
-                    try:
-                        viva_marks = VivaMarks.objects.get(student=student)
+                    viva = viva_marks_dict.get(s_id)
+                    if viva:
                         viva_marks_data = {
-                            'marks': viva_marks.marks,
-                            'rubrics_marks': viva_marks.rubrics_marks,
-                            'remarks': viva_marks.remarks
+                            'marks': viva.marks,
+                            'rubrics_marks': viva.rubrics_marks,
+                            'remarks': viva.remarks
                         }
-                    except VivaMarks.DoesNotExist:
+                    else:
                         viva_marks_data = {
                             'marks': 0,
                             'rubrics_marks': {},
@@ -370,6 +387,7 @@ def get_all_results_by_teacher(request, teacher_id):
                         'viva_marks': viva_marks_data
                     }
                     results_data.append(result_item)
+
 
         # Apply pagination
         paginator = ResultsPagination()

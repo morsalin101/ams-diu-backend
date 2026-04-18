@@ -185,6 +185,8 @@ class StudentExamQuestionsView(generics.RetrieveAPIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+import json
+
 @extend_schema(
     operation_id='submit_exam',
     summary="Submit exam answers",
@@ -242,15 +244,68 @@ def submit_exam(request, exam_id):
             # Get the ExamQuestion (not ScrappedQuestion)
             exam_question = ExamQuestion.objects.get(id=question_id, exam=exam)
             
-            # Check if answer is correct
+            # Parse the correct answer which might be stored as a JSON string (e.g. '["গ"]')
+            correct_answers_raw = exam_question.answer
+            correct_answers = []
+            
+            if isinstance(correct_answers_raw, str):
+                try:
+                    parsed_answer = json.loads(correct_answers_raw)
+                    if isinstance(parsed_answer, list):
+                        correct_answers = [str(x).strip() for x in parsed_answer]
+                    else:
+                        correct_answers = [str(parsed_answer).strip()]
+                except json.JSONDecodeError:
+                    correct_answers = [str(correct_answers_raw).strip()]
+            elif isinstance(correct_answers_raw, list):
+                correct_answers = [str(x).strip() for x in correct_answers_raw]
+            else:
+                correct_answers = [str(correct_answers_raw).strip()]
+
+            # Determine correctness
+            def normalize_str(s):
+                if not isinstance(s, str): return str(s)
+                import re
+                # replace smart quotes, normalize whitespace
+                s = s.replace("‘", "'").replace("’", "'").replace("“", '"').replace("”", '"')
+                return re.sub(r'\s+', '', s.lower())
+
             is_correct = False
+            submitted_answer = str(answer).strip()
+
             if exam_question.type == 'option':
-                # For option type, compare with correct answer
-                correct_answers = exam_question.answer if isinstance(exam_question.answer, list) else [exam_question.answer]
-                is_correct = answer in correct_answers
-            elif exam_question.type == 'text':
-                # For text type, simple string comparison
-                is_correct = answer.lower() == str(exam_question.answer).lower()
+                # Check normal key
+                is_correct = normalize_str(submitted_answer) in [normalize_str(c) for c in correct_answers]
+                # Also check value just in case they sent the text value
+                if not is_correct and isinstance(exam_question.options, dict):
+                    opt_values = {normalize_str(k): normalize_str(v) for k, v in exam_question.options.items()}
+                    if normalize_str(submitted_answer) in opt_values.values():
+                        # user sent the value text!
+                        for c_key in correct_answers:
+                            norm_c_key = normalize_str(c_key)
+                            if opt_values.get(norm_c_key) == normalize_str(submitted_answer):
+                                is_correct = True
+                                break
+                    else:
+                        # user sent a key, verify it
+                        norm_sub_key = normalize_str(submitted_answer)
+                        for c_key in correct_answers:
+                            norm_c_key = normalize_str(c_key)
+                            if opt_values.get(norm_sub_key) == norm_c_key:
+                                is_correct = True
+                                break
+            else:
+                is_correct = any(normalize_str(submitted_answer) == normalize_str(ca) for ca in correct_answers)
+            # Add debug printing as per requirement
+            print("========================================")
+            print(f"DEBUG EXAM SUBMISSION")
+            print(f"Question ID: {question_id}")
+            print(f"Question Type: {exam_question.type}")
+            print(f"User answer: '{submitted_answer}'")
+            print(f"Correct answer(s) (raw): {repr(correct_answers_raw)}")
+            print(f"Correct answer(s) (parsed): {correct_answers}")
+            print(f"Is Correct?: {is_correct}")
+            print("========================================")
             
             # Create or update submission
             submission, created = Submission.objects.update_or_create(
@@ -344,12 +399,17 @@ def get_exam_result(request, student_id, exam_id):
     
     # Calculate results
     total_attempted = submissions.count()
-    correct_answers = submissions.filter(is_correct=True).count()
+    correct_submissions = submissions.filter(is_correct=True)
+    correct_answers = correct_submissions.count()
     wrong_answers = total_attempted - correct_answers
     
+    total_questions = ExamQuestion.objects.filter(exam=exam).count()
+    total_marks = sum(ExamQuestion.objects.filter(exam=exam).values_list('marks', flat=True))
+    obtained_marks = sum(s.question.marks for s in correct_submissions)
+    
     # Calculate percentage
-    if total_attempted > 0:
-        score_percentage = round((correct_answers / total_attempted) * 100, 2)
+    if total_marks > 0:
+        score_percentage = round((obtained_marks / total_marks) * 100, 2)
     else:
         score_percentage = 0
     
@@ -380,6 +440,8 @@ def get_exam_result(request, student_id, exam_id):
             'total_questions_attempted': total_attempted,
             'correct_answers': correct_answers,
             'wrong_answers': wrong_answers,
+            'obtained_marks': obtained_marks,
+            'total_marks': total_marks,
             'score_percentage': score_percentage,
             'grade': grade
         }
@@ -462,15 +524,20 @@ def calculate_exam_result(request, exam_id):
         submissions = Submission.objects.filter(student=student, exam=exam)
         
         total_attempted = submissions.count()
-        correct_answers = submissions.filter(is_correct=True).count()
+        correct_submissions = submissions.filter(is_correct=True)
+        correct_answers = correct_submissions.count()
         wrong_answers = total_attempted - correct_answers
         
-        # Calculate percentage
-        if total_attempted > 0:
-            score_percentage = round((correct_answers / total_attempted) * 100, 2)
+        total_questions = ExamQuestion.objects.filter(exam=exam).count()
+        total_marks = sum(ExamQuestion.objects.filter(exam=exam).values_list('marks', flat=True))
+        obtained_marks = sum(s.question.marks for s in correct_submissions)
+        
+        # Calculate percentage using obtained marks vs total marks
+        if total_marks > 0:
+            score_percentage = round((obtained_marks / total_marks) * 100, 2)
         else:
             score_percentage = 0
-        
+            
         all_scores.append(score_percentage)
         
         # Determine grade
@@ -494,6 +561,8 @@ def calculate_exam_result(request, exam_id):
             'total_questions_attempted': total_attempted,
             'correct_answers': correct_answers,
             'wrong_answers': wrong_answers,
+            'obtained_marks': obtained_marks,
+            'total_marks': total_marks,
             'score_percentage': score_percentage,
             'grade': grade
         }
