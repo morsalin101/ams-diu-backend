@@ -10,18 +10,15 @@ class Command(BaseCommand):
         with transaction.atomic():
             # Menu data based on your frontend structure
             menu_data = [
+                # Dashboard
                 {
                     'label': 'Dashboard',
                     'icon': 'LayoutDashboard',
                     'link': '/dashboard',
                     'component': 'Dashboard'
                 },
-                {
-                    'label':'Upload Questions(DB)',
-                    'icon':'FilePlus',
-                    'link': '/insert-questions',
-                    'component': 'InsertQuestions'
-                },
+
+                # Question Management
                 {
                     'label': 'Create Question Set',
                     'icon': 'Plus',
@@ -35,41 +32,31 @@ class Command(BaseCommand):
                     'component': 'AllQuestions'
                 },
                 {
-                    'label': 'Students',
-                    'icon': 'Users',
-                    'link': '/students',
-                    'component': 'Students'
+                    'label': 'Upload Questions(DB)',
+                    'icon': 'FilePlus',
+                    'link': '/insert-questions',
+                    'component': 'InsertQuestions'
                 },
                 {
-                    'label': 'Exam Schedule',
-                    'icon': 'Calendar',
-                    'link': '/exam-schedule',
-                    'component': 'ExamSchedule'
+                    'label': 'Delete Questions(DB)',
+                    'icon': 'Trash2',
+                    'link': '/deletequestions',
+                    'component': 'DeleteQuestions'
                 },
                 {
-                    'label': 'Users Management',
-                    'icon': 'UserCheck',
-                    'link': '/users-management',
-                    'component': 'UsersManagement'
+                    'label': 'Blocked Questions',
+                    'icon': 'Slash',
+                    'link': '/blocked-questions',
+                    'component': 'BlockedQuestions'
                 },
                 {
-                    'label': 'Role Management',
-                    'icon': 'Shield',
-                    'link': '/role-management',
-                    'component': 'RoleManagement'
+                    'label': 'AI Question Scrapper',
+                    'icon': 'Cpu',
+                    'link': '/ai-question-scrapper',
+                    'component': 'AiQuestionScrapper'
                 },
-                {
-                    'label': 'Menu Management',
-                    'icon': 'Menu',
-                    'link': '/menu-management',
-                    'component': 'MenuManagement'
-                },
-                {
-                    'label': 'Menu Access Management',
-                    'icon': 'Key',
-                    'link': '/menu-access-management',
-                    'component': 'MenuAccessManagement'
-                },
+
+                # Exam Controls and Mapping
                 {
                     'label': 'Faculty Management',
                     'icon': 'Landmark',
@@ -107,34 +94,30 @@ class Command(BaseCommand):
                     'component': 'SubjectPriorityMapping'
                 },
                 {
-                    'label':'Student Assign',
-                    'icon':'UserPlus',
-                    'link':'/student-assign-teacher-exam',
-                    'component':'StudentAssignTeacherExam'
+                    'label': 'Viva Rubrics Management',
+                    'icon': 'Mic',
+                    'link': '/viva-rubrics-management',
+                    'component': 'VivaManagement'
                 },
                 {
-                    'label': 'Viva Marks Entry',
-                    'icon': 'FilePlus',
-                    'link': '/viva-marks-entry',
-                    'component': 'Results'
+                    'label': 'Marks Distribution Management',
+                    'icon': 'Percent',
+                    'link': '/marks-distribution',
+                    'component': 'MarksDistribution'
                 },
                 {
-                    'label': 'Blocked Questions',
-                    'icon': 'Slash',
-                    'link': '/blocked-questions',
-                    'component': 'BlockedQuestions'
+                    'label': 'Report Signatories',
+                    'icon': 'UserCheck',
+                    'link': '/report-signatories',
+                    'component': 'ReportSignatories'
                 },
+
+                # Departmental Controls
                 {
-                    'label': 'Delete Questions(DB)',
-                    'icon': 'Trash2',
-                    'link': '/deletequestions',
-                    'component': 'DeleteQuestions'
-                },
-                {
-                    'label': 'AI Question Scrapper',
-                    'icon': 'Cpu',
-                    'link': '/ai-question-scrapper',
-                    'component': 'AiQuestionScrapper'
+                    'label': 'Student Acceptance Criteria',
+                    'icon': 'Sliders',
+                    'link': '/student-acceptance-criteria',
+                    'component': 'ThresholdManagement'
                 },
                 {
                     'label': 'Publish Exam',
@@ -143,40 +126,16 @@ class Command(BaseCommand):
                     'component': 'PublishedExams'
                 },
                 {
-                    'label':'Viva Rubrics Management',
-                    'icon':'Mic',
-                    'link':'/viva-rubrics-management',
-                    'component':'VivaManagement'
+                    'label': 'Exam Schedule',
+                    'icon': 'Calendar',
+                    'link': '/exam-schedule',
+                    'component': 'ExamSchedule'
                 },
                 {
-                    'label':'Marks Distribution Management',
-                    'icon':'Percent',
-                    'link':'/marks-distribution',
-                    'component':'MarksDistribution'
-                },
-                {
-                    'label':'Viva marks',
-                    'icon':'Edit',
-                    'link':'/viva-marks',
-                    'component':'VivaMarks'
-                },
-                {
-                    'label':'Student Acceptance Criteria',
-                    'icon':'Sliders',
-                    'link':'/student-acceptance-criteria',
-                    'component':'ThresholdManagement'
-                },
-                {
-                    'label':'My Students',
-                    'icon':'UserGroup',
-                    'link':'/my-students',
-                    'component':'MyStudents'
-                },
-                {
-                    'label':'All Results',
-                    'icon':'FileText',
-                    'link':'/all-results',
-                    'component':'AllResults'
+                    'label': 'Student Assign',
+                    'icon': 'UserPlus',
+                    'link': '/student-assign-teacher-exam',
+                    'component': 'StudentAssignTeacherExam'
                 },
                 {
                     'label': 'Override Selection',
@@ -190,19 +149,72 @@ class Command(BaseCommand):
                     'link': '/results',
                     'component': 'AcceptedStudents'
                 },
+
+                # Faculty Controls
                 {
-                    'label':'My Schedule',
-                    'icon':'FileSearch',
-                    'link':'/my-schedule',
-                    'component':'MySchedule'
+                    'label': 'My Schedule',
+                    'icon': 'FileSearch',
+                    'link': '/my-schedule',
+                    'component': 'MySchedule'
                 },
                 {
-                    'label': 'Report Signatories',
+                    'label': 'Viva Marks Entry',
+                    'icon': 'FilePlus',
+                    'link': '/viva-marks-entry',
+                    'component': 'Results'
+                },
+                {
+                    'label': 'Viva marks',
+                    'icon': 'Edit',
+                    'link': '/viva-marks',
+                    'component': 'VivaMarks'
+                },
+                {
+                    'label': 'My Students',
+                    'icon': 'UserGroup',
+                    'link': '/my-students',
+                    'component': 'MyStudents'
+                },
+
+                # Admission Office
+                {
+                    'label': 'Students',
+                    'icon': 'Users',
+                    'link': '/students',
+                    'component': 'Students'
+                },
+                {
+                    'label': 'All Results',
+                    'icon': 'FileText',
+                    'link': '/all-results',
+                    'component': 'AllResults'
+                },
+
+                # Users & Roles
+                {
+                    'label': 'Menu Management',
+                    'icon': 'Menu',
+                    'link': '/menu-management',
+                    'component': 'MenuManagement'
+                },
+                {
+                    'label': 'Menu Access Management',
+                    'icon': 'Key',
+                    'link': '/menu-access-management',
+                    'component': 'MenuAccessManagement'
+                },
+                {
+                    'label': 'Role Management',
+                    'icon': 'Shield',
+                    'link': '/role-management',
+                    'component': 'RoleManagement'
+                },
+                {
+                    'label': 'Users Management',
                     'icon': 'UserCheck',
-                    'link': '/report-signatories',
-                    'component': 'ReportSignatories'
+                    'link': '/users-management',
+                    'component': 'UsersManagement'
                 }
-               
             ]
 
             # Create or update menus using component as the stable identity
